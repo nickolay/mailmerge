@@ -1,5 +1,6 @@
 # Mailmerge config files
 /mailmerge_database.csv
+/mailmerge_database.jsonl
 /mailmerge_template.txt
 /mailmerge_server.conf
 
@@ -7,7 +8,7 @@
 *.pyc
 __pycache__
 
-# Python virtual environment 
+# Python virtual environment
 /env/
 /env2/
 /env3/

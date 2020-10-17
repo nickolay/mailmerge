@@ -80,6 +80,12 @@ if sys.stdout.encoding != 'UTF-8' and not hasattr(sys.stdout, "buffer"):
             existing directory or a file path template with {{variables}}."""
 )
 @click.option(
+    "--database-format", "database_format",
+    default="csv",
+    type=click.Choice(["csv", "jsonl"]),
+    help="",
+)
+@click.option(
     "--output-format", "output_format",
     default="colorized",
     type=click.Choice(["colorized", "text", "raw"]),
@@ -87,7 +93,7 @@ if sys.stdout.encoding != 'UTF-8' and not hasattr(sys.stdout, "buffer"):
 )
 def main(sample, dry_run, limit, no_limit, resume,
          template_path, database_path, config_path, dump_to,
-         output_format):
+         database_format, output_format):
     """
     Mailmerge is a simple, command line mail merge tool.
 
@@ -121,9 +127,9 @@ def main(sample, dry_run, limit, no_limit, resume,
     message_num = 1 + start
     try:
         template_message = TemplateMessage(template_path, dump_to=dump_to)
-        csv_database = read_csv_database(database_path)
+        datasource = read_database(database_path, database_format)
         sendmail_client = SendmailClient(config_path, dry_run)
-        for _, row in enumerate_range(csv_database, start, stop):
+        for _, row in enumerate_range(datasource, start, stop):
             row.update(_mailmerge_message_num=message_num)
             sender, recipients, message, dump_to_path = \
                 template_message.render(row)
@@ -277,6 +283,16 @@ def create_sample_input_files(template_path, database_path, config_path):
     )))
 
 
+def read_database(database_path, database_format):
+    if database_format == "csv":
+        return read_csv_database(database_path)
+    elif database_format == "jsonl":
+        return read_jsonl_database(database_path)
+    else:
+        assert False, "Unsupported database_format: %s" % database_format
+
+
+
 def read_csv_database(database_path):
     """Read database CSV file, providing one line at a time.
 
@@ -299,6 +315,17 @@ def read_csv_database(database_path):
                 "{}:{}: {}".format(database_path, reader.line_num, err)
             )
 
+
+def read_jsonl_database(database_path):
+    import json
+    with database_path.open(mode="r", encoding="utf-8") as database_file:
+        for line_num, line in enumerate(database_file.readlines(), start = 1):
+            try:
+                yield json.loads(line)
+            except json.decoder.JSONDecodeError as err:
+                raise exceptions.MailmergeError(
+                    "{}:{}:{}: {}".format(database_path, line_num, err.colno, err.msg)
+                )
 
 def enumerate_range(iterable, start=0, stop=None):
     """Enumerate iterable, starting at index "start", stopping before "stop".
